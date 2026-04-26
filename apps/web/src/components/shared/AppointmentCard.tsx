@@ -13,18 +13,21 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/ui/StatusBadge';
-import type { Appointment } from '@/data/mock';
+import NoShowIndicator from '@/components/shared/NoShowIndicator';
+import type { Appointment } from '@/types';
 
 interface AppointmentCardProps {
   appointment: Appointment;
   className?: string;
   expandable?: boolean;
+  showPrediction?: boolean;
 }
 
 export function AppointmentCard({
   appointment,
   className,
   expandable = false,
+  showPrediction = false,
 }: AppointmentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const hasVisit = !!appointment.visit;
@@ -47,14 +50,19 @@ export function AppointmentCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-base font-semibold text-gray-900">
-              {appointment.doctor.fullName}
+              {appointment.doctor?.fullName ?? '—'}
             </h3>
             <StatusBadge status={appointment.status} />
+            {showPrediction && appointment.prediction && (
+              <NoShowIndicator probability={appointment.prediction.noShowProbability} />
+            )}
           </div>
 
-          <p className="mt-1 text-sm text-purple-600 font-medium">
-            {appointment.doctor.specialization}
-          </p>
+          {appointment.doctor?.specialization && (
+            <p className="mt-1 text-sm text-purple-600 font-medium">
+              {appointment.doctor.specialization}
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-500">
             <div className="flex items-center gap-1.5">
@@ -74,10 +82,12 @@ export function AppointmentCard({
                 &middot; {appointment.durationMin} мин
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-gray-400" />
-              <span className="line-clamp-1">{appointment.center.name}</span>
-            </div>
+            {appointment.center?.name && (
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-gray-400" />
+                <span className="line-clamp-1">{appointment.center.name}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -136,14 +146,14 @@ export function AppointmentCard({
             )}
           </div>
 
-          {appointment.visit.prescriptions.length > 0 && (
+          {(appointment.visit.prescriptions?.length ?? 0) > 0 && (
             <div className="mt-4 border-t border-gray-200/60 pt-4">
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                 <Pill className="h-4 w-4 text-purple-500" />
                 Назначения
               </div>
               <div className="space-y-2">
-                {appointment.visit.prescriptions.map((rx) => (
+                {appointment.visit.prescriptions!.map((rx) => (
                   <div
                     key={rx.id}
                     className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm border border-gray-100"

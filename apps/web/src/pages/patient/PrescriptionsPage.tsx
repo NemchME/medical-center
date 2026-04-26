@@ -1,45 +1,52 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 import { Pill, User, Calendar } from 'lucide-react';
-import { USE_MOCK, MOCK_APPOINTMENTS } from '@/data/mock';
-import type { Appointment, Prescription } from '@/data/mock';
+import { appointmentsApi } from '@/api/appointments';
+import type { Appointment, ID } from '@/types';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 
-interface PrescriptionWithContext extends Prescription {
+interface PrescriptionRow {
+  id: ID;
+  text: string;
+  status: string;
   doctorName: string;
   specialization: string;
   visitDate: string;
 }
 
 export function PrescriptionsPage() {
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', 'mine'],
+    queryFn: () => appointmentsApi.mine(),
+  });
+
   const prescriptions = useMemo(() => {
-    if (!USE_MOCK) return new Map<string, PrescriptionWithContext[]>();
+    const completedVisits = appointments
+      .filter(
+        (a) =>
+          a.status === 'completed' &&
+          a.visit &&
+          (a.visit.prescriptions?.length ?? 0) > 0,
+      )
+      .sort(
+        (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+      );
 
-    const completedVisits = MOCK_APPOINTMENTS.filter(
-      (a) =>
-        a.patientId === 1 &&
-        a.status === 'completed' &&
-        a.visit &&
-        a.visit.prescriptions.length > 0,
-    ).sort(
-      (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
-    );
-
-    const grouped = new Map<string, PrescriptionWithContext[]>();
+    const grouped = new Map<string, PrescriptionRow[]>();
 
     completedVisits.forEach((apt: Appointment) => {
       if (!apt.visit) return;
-      const dateKey = format(new Date(apt.startAt), 'yyyy-MM-dd');
-      const label = format(new Date(apt.startAt), 'd MMMM yyyy', {
-        locale: ru,
-      });
+      const label = format(new Date(apt.startAt), 'd MMMM yyyy', { locale: ru });
 
-      const items = apt.visit.prescriptions.map((rx) => ({
-        ...rx,
-        doctorName: apt.doctor.fullName,
-        specialization: apt.doctor.specialization,
+      const items: PrescriptionRow[] = (apt.visit.prescriptions ?? []).map((rx) => ({
+        id: rx.id,
+        text: rx.text,
+        status: rx.status,
+        doctorName: apt.doctor?.fullName ?? '—',
+        specialization: apt.doctor?.specialization ?? '',
         visitDate: apt.startAt,
       }));
 
@@ -48,13 +55,17 @@ export function PrescriptionsPage() {
     });
 
     return grouped;
-  }, []);
+  }, [appointments]);
 
   const totalCount = useMemo(() => {
     let count = 0;
     prescriptions.forEach((items) => (count += items.length));
     return count;
   }, [prescriptions]);
+
+  if (isLoading) {
+    return <div className="text-gray-500 text-center py-12">Загрузка…</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -85,7 +96,7 @@ export function PrescriptionsPage() {
               <div className="space-y-3">
                 {items.map((rx) => (
                   <div
-                    key={rx.id}
+                    key={String(rx.id)}
                     className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -101,9 +112,11 @@ export function PrescriptionsPage() {
                           <User className="h-3.5 w-3.5 text-gray-400" />
                           <span>
                             {rx.doctorName}{' '}
-                            <span className="text-purple-600">
-                              ({rx.specialization})
-                            </span>
+                            {rx.specialization && (
+                              <span className="text-purple-600">
+                                ({rx.specialization})
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>

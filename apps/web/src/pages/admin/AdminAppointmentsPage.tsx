@@ -1,22 +1,19 @@
 import { useState, useMemo } from 'react';
 import { format, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarCheck,
   CalendarPlus,
-  Clock,
   CheckCircle2,
   AlertTriangle,
   Calendar,
 } from 'lucide-react';
-import {
-  USE_MOCK,
-  MOCK_APPOINTMENTS,
-  MOCK_PATIENTS,
-  MOCK_DOCTORS,
-  MOCK_CENTERS,
-} from '@/data/mock';
-import type { Appointment } from '@/data/mock';
+import { appointmentsApi, type AppointmentFilters } from '@/api/appointments';
+import { patientsApi } from '@/api/patients';
+import { doctorsApi } from '@/api/doctors';
+import { centersApi } from '@/api/centers';
+import type { Appointment } from '@/types';
 import DataTable from '@/components/ui/DataTable';
 import type { Column } from '@/components/ui/DataTable';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -43,18 +40,14 @@ function NoShowIndicator({ probability }: { probability?: number }) {
         ? 'text-yellow-600 bg-yellow-50'
         : 'text-green-600 bg-green-50';
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-        color,
-      )}
-    >
+    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', color)}>
       {pct}%
     </span>
   );
 }
 
 export function AdminAppointmentsPage() {
+  const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [doctorFilter, setDoctorFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -68,10 +61,62 @@ export function AdminAppointmentsPage() {
   const [formTime, setFormTime] = useState('');
   const [formDuration, setFormDuration] = useState('30');
 
-  const allAppointments = USE_MOCK ? MOCK_APPOINTMENTS : [];
-  const patients = USE_MOCK ? MOCK_PATIENTS : [];
-  const doctors = USE_MOCK ? MOCK_DOCTORS : [];
-  const centers = USE_MOCK ? MOCK_CENTERS : [];
+  const filters: AppointmentFilters = useMemo(
+    () => ({
+      status: statusFilter || undefined,
+      doctorId: doctorFilter ? Number(doctorFilter) : undefined,
+      from: dateFrom || undefined,
+      to: dateTo
+        ? new Date(new Date(dateTo).setHours(23, 59, 59, 999)).toISOString()
+        : undefined,
+    }),
+    [statusFilter, doctorFilter, dateFrom, dateTo],
+  );
+
+  const { data: allAppointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', 'all'],
+    queryFn: () => appointmentsApi.list(),
+  });
+
+  const { data: filtered = [] } = useQuery({
+    queryKey: ['appointments', 'filtered', filters],
+    queryFn: () => appointmentsApi.list(filters),
+  });
+
+  const { data: patients = [] } = useQuery({
+    queryKey: ['patients'],
+    queryFn: () => patientsApi.list(),
+  });
+  const { data: doctors = [] } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: () => doctorsApi.list(),
+  });
+  const { data: centers = [] } = useQuery({
+    queryKey: ['centers'],
+    queryFn: () => centersApi.list(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      appointmentsApi.create({
+        patientId: Number(formPatient),
+        doctorId: Number(formDoctor),
+        centerId: Number(formCenter),
+        startAt: new Date(`${formDate}T${formTime}:00`).toISOString(),
+        durationMin: Number(formDuration),
+        sourceChannel: 'admin',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] });
+      setIsCreateOpen(false);
+      setFormPatient('');
+      setFormDoctor('');
+      setFormCenter('');
+      setFormDate('');
+      setFormTime('');
+      setFormDuration('30');
+    },
+  });
 
   const stats = useMemo(() => {
     const total = allAppointments.length;
@@ -81,28 +126,6 @@ export function AdminAppointmentsPage() {
     return { total, today, confirmed, noShow };
   }, [allAppointments]);
 
-  const filtered = useMemo(() => {
-    let result = allAppointments;
-
-    if (statusFilter) {
-      result = result.filter((a) => a.status === statusFilter);
-    }
-    if (doctorFilter) {
-      result = result.filter((a) => a.doctorId === Number(doctorFilter));
-    }
-    if (dateFrom) {
-      const from = new Date(dateFrom);
-      result = result.filter((a) => new Date(a.startAt) >= from);
-    }
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-      result = result.filter((a) => new Date(a.startAt) <= to);
-    }
-
-    return result;
-  }, [allAppointments, statusFilter, doctorFilter, dateFrom, dateTo]);
-
   type AppointmentRow = Appointment & Record<string, unknown>;
 
   const columns: Column<AppointmentRow>[] = [
@@ -111,16 +134,14 @@ export function AdminAppointmentsPage() {
       header: 'ID',
       sortable: true,
       width: '60px',
-      render: (row) => (
-        <span className="font-mono text-xs text-gray-500">#{row.id}</span>
-      ),
+      render: (row) => <span className="font-mono text-xs text-gray-500">#{String(row.id)}</span>,
     },
     {
       key: 'patientName',
       header: 'Пациент',
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900">{row.patient.fullName}</span>
+        <span className="font-medium text-gray-900">{row.patient?.fullName ?? '—'}</span>
       ),
     },
     {
@@ -128,17 +149,15 @@ export function AdminAppointmentsPage() {
       header: 'Врач',
       render: (row) => (
         <div>
-          <p className="text-sm text-gray-900">{row.doctor.fullName}</p>
-          <p className="text-xs text-gray-500">{row.doctor.specialization}</p>
+          <p className="text-sm text-gray-900">{row.doctor?.fullName ?? '—'}</p>
+          <p className="text-xs text-gray-500">{row.doctor?.specialization ?? ''}</p>
         </div>
       ),
     },
     {
       key: 'centerName',
       header: 'Центр',
-      render: (row) => (
-        <span className="text-sm text-gray-600">{row.center.name}</span>
-      ),
+      render: (row) => <span className="text-sm text-gray-600">{row.center?.name ?? '—'}</span>,
     },
     {
       key: 'startAt',
@@ -149,9 +168,7 @@ export function AdminAppointmentsPage() {
           <p className="text-sm font-medium text-gray-900">
             {format(new Date(row.startAt), 'd MMM yyyy', { locale: ru })}
           </p>
-          <p className="text-xs text-gray-500">
-            {format(new Date(row.startAt), 'HH:mm')}
-          </p>
+          <p className="text-xs text-gray-500">{format(new Date(row.startAt), 'HH:mm')}</p>
         </div>
       ),
     },
@@ -159,9 +176,7 @@ export function AdminAppointmentsPage() {
       key: 'durationMin',
       header: 'Длительность',
       width: '110px',
-      render: (row) => (
-        <span className="text-sm text-gray-600">{row.durationMin} мин</span>
-      ),
+      render: (row) => <span className="text-sm text-gray-600">{row.durationMin} мин</span>,
     },
     {
       key: 'status',
@@ -172,46 +187,22 @@ export function AdminAppointmentsPage() {
       key: 'prediction',
       header: 'Прогноз',
       width: '90px',
-      render: (row) => (
-        <NoShowIndicator probability={row.prediction?.noShowProbability} />
-      ),
+      render: (row) => <NoShowIndicator probability={row.prediction?.noShowProbability} />,
     },
   ];
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsCreateOpen(false);
-    setFormPatient('');
-    setFormDoctor('');
-    setFormCenter('');
-    setFormDate('');
-    setFormTime('');
-    setFormDuration('30');
+    createMutation.mutate();
   };
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={CalendarCheck}
-          value={stats.total}
-          label="Всего записей"
-        />
-        <StatCard
-          icon={Calendar}
-          value={stats.today}
-          label="Сегодня"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          value={stats.confirmed}
-          label="Подтверждённые"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          value={stats.noShow}
-          label="Неявки"
-        />
+        <StatCard icon={CalendarCheck} value={stats.total} label="Всего записей" />
+        <StatCard icon={Calendar} value={stats.today} label="Сегодня" />
+        <StatCard icon={CheckCircle2} value={stats.confirmed} label="Подтверждённые" />
+        <StatCard icon={AlertTriangle} value={stats.noShow} label="Неявки" />
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -255,7 +246,7 @@ export function AdminAppointmentsPage() {
           >
             <option value="">Все врачи</option>
             {doctors.map((d) => (
-              <option key={d.id} value={d.id}>
+              <option key={String(d.id)} value={String(d.id)}>
                 {d.fullName}
               </option>
             ))}
@@ -301,11 +292,16 @@ export function AdminAppointmentsPage() {
         Показано: {filtered.length} из {allAppointments.length}
       </p>
 
-      <DataTable
-        data={filtered as unknown as Record<string, unknown>[]}
-        columns={columns as unknown as Column<Record<string, unknown>>[]}
-        emptyMessage="Нет записей с заданными фильтрами"
-      />
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-500">Загрузка…</div>
+      ) : (
+        <DataTable
+          data={filtered as unknown as Record<string, unknown>[]}
+          columns={columns as unknown as Column<Record<string, unknown>>[]}
+          emptyMessage="Нет записей с заданными фильтрами"
+        />
+      )}
+
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -314,9 +310,7 @@ export function AdminAppointmentsPage() {
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Пациент
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Пациент</label>
             <select
               value={formPatient}
               onChange={(e) => setFormPatient(e.target.value)}
@@ -325,7 +319,7 @@ export function AdminAppointmentsPage() {
             >
               <option value="">Выберите пациента</option>
               {patients.map((p) => (
-                <option key={p.id} value={p.id}>
+                <option key={String(p.id)} value={String(p.id)}>
                   {p.fullName}
                 </option>
               ))}
@@ -333,9 +327,7 @@ export function AdminAppointmentsPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Врач
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Врач</label>
             <select
               value={formDoctor}
               onChange={(e) => setFormDoctor(e.target.value)}
@@ -344,17 +336,15 @@ export function AdminAppointmentsPage() {
             >
               <option value="">Выберите врача</option>
               {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.fullName} -- {d.specialization}
+                <option key={String(d.id)} value={String(d.id)}>
+                  {d.fullName} -- {d.specialization ?? ''}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Центр
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Центр</label>
             <select
               value={formCenter}
               onChange={(e) => setFormCenter(e.target.value)}
@@ -363,7 +353,7 @@ export function AdminAppointmentsPage() {
             >
               <option value="">Выберите центр</option>
               {centers.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={String(c.id)} value={String(c.id)}>
                   {c.name}
                 </option>
               ))}
@@ -372,9 +362,7 @@ export function AdminAppointmentsPage() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Дата
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Дата</label>
               <input
                 type="date"
                 value={formDate}
@@ -384,9 +372,7 @@ export function AdminAppointmentsPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Время
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Время</label>
               <input
                 type="time"
                 value={formTime}
@@ -396,9 +382,7 @@ export function AdminAppointmentsPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Длительность
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Длительность</label>
               <select
                 value={formDuration}
                 onChange={(e) => setFormDuration(e.target.value)}
@@ -413,6 +397,12 @@ export function AdminAppointmentsPage() {
             </div>
           </div>
 
+          {createMutation.isError && (
+            <div className="text-sm text-red-600">
+              Ошибка: {(createMutation.error as Error).message}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
@@ -423,9 +413,10 @@ export function AdminAppointmentsPage() {
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700"
+              disabled={createMutation.isPending}
+              className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 disabled:opacity-50"
             >
-              Создать
+              {createMutation.isPending ? 'Создание…' : 'Создать'}
             </button>
           </div>
         </form>

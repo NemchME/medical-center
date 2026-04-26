@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Briefcase, GraduationCap, Building2 } from 'lucide-react';
-import type { Doctor } from '@/data/mock';
+import type { Doctor } from '@/types';
 
 interface DoctorCardProps {
   doctor: Doctor;
@@ -19,26 +19,36 @@ export default function DoctorCard({ doctor, className }: DoctorCardProps) {
 
       <div className="p-5">
         <div className="flex items-start gap-4">
-          <img
-            src={doctor.photoUrl}
-            alt={doctor.fullName}
-            className="h-16 w-16 rounded-full object-cover ring-2 ring-purple-100"
-          />
+          {doctor.photoUrl ? (
+            <img
+              src={doctor.photoUrl}
+              alt={doctor.fullName}
+              className="h-16 w-16 rounded-full object-cover ring-2 ring-purple-100"
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-purple-100 ring-2 ring-purple-100 flex items-center justify-center text-purple-700 font-semibold">
+              {doctor.fullName?.charAt(0)}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-base font-semibold text-gray-900">
               {doctor.fullName}
             </h3>
-            <p className="mt-0.5 text-sm font-medium text-purple-600">
-              {doctor.specialization}
-            </p>
+            {doctor.specialization && (
+              <p className="mt-0.5 text-sm font-medium text-purple-600">
+                {doctor.specialization}
+              </p>
+            )}
           </div>
         </div>
 
         <div className="mt-4 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Briefcase className="h-4 w-4 flex-shrink-0 text-gray-400" />
-            <span>Опыт: {doctor.experience}</span>
-          </div>
+          {doctor.experience && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Briefcase className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <span>Опыт: {doctor.experience}</span>
+            </div>
+          )}
 
           {doctor.education && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -47,10 +57,12 @@ export default function DoctorCard({ doctor, className }: DoctorCardProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Building2 className="h-4 w-4 flex-shrink-0 text-gray-400" />
-            <span className="truncate">{doctor.center.name}</span>
-          </div>
+          {doctor.center?.name && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Building2 className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <span className="truncate">{doctor.center.name}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

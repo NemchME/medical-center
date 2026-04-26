@@ -74,4 +74,20 @@ export class DoctorService {
       include: { center: true },
     });
   }
+
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.doctor.delete({ where: { id } });
+    return { success: true };
+  }
+
+  async findByUserId(userId: number) {
+    return this.prisma.doctor.findUnique({
+      where: { userId },
+      include: {
+        center: true,
+        schedules: { orderBy: { dayOfWeek: 'asc' } },
+      },
+    });
+  }
 }

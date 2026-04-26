@@ -1,5 +1,5 @@
 {
-  "name": "medecina",
+  "name": "medicina",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -12,14 +12,23 @@
     "lint": "turbo run lint",
     "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
     "db:generate": "prisma generate --schema=prisma/schema.prisma",
-    "db:studio": "prisma studio --schema=prisma/schema.prisma"
+    "db:studio": "prisma studio --schema=prisma/schema.prisma",
+    "db:seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "bcrypt": "^5.1.1",
     "prisma": "^6.3.0",
-    "turbo": "^2.4.0"
+    "ts-node": "^10.9.2",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
   },
   "packageManager": "npm@10.0.0",
   "dependencies": {
-    "@prisma/client": "^6.19.2"
+    "@prisma/client": "^6.19.3"
   }
 }

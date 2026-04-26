@@ -51,4 +51,28 @@ export class TestResultService {
       include: { test: true },
     });
   }
+
+  async update(
+    id: number,
+    dto: { result?: string; unit?: string; refRange?: string; status?: string },
+  ) {
+    await this.findOne(id);
+    return this.prisma.testResult.update({
+      where: { id },
+      data: dto,
+      include: { test: true },
+    });
+  }
+
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.testResult.delete({ where: { id } });
+    return { success: true };
+  }
+
+  async findByPatientUserId(userId: number) {
+    const patient = await this.prisma.patient.findUnique({ where: { userId } });
+    if (!patient) return [];
+    return this.findByPatient(Number(patient.id));
+  }
 }

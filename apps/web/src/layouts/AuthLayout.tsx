@@ -1,4 +1,4 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link } from "react-router-dom";
 
 export function AuthLayout() {
   return (
@@ -12,7 +12,9 @@ export function AuthLayout() {
           <div className="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center text-xl font-black text-white shadow-lg shadow-primary-500/30">
             M
           </div>
-          <span className="text-3xl font-bold text-white tracking-tight">Medecina</span>
+          <span className="text-3xl font-bold text-white tracking-tight">
+            medicina
+          </span>
         </Link>
         <div className="glass rounded-2xl p-8 shadow-2xl animate-slide-up">
           <Outlet />

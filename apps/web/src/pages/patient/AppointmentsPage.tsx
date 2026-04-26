@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { USE_MOCK, MOCK_APPOINTMENTS } from '@/data/mock';
+import { appointmentsApi } from '@/api/appointments';
 import { AppointmentCard } from '@/components/shared/AppointmentCard';
 import EmptyState from '@/components/ui/EmptyState';
 
@@ -16,31 +17,31 @@ const TABS: { key: TabKey; label: string }[] = [
 export function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('upcoming');
 
-  const patientAppointments = useMemo(() => {
-    if (!USE_MOCK) return [];
-    return MOCK_APPOINTMENTS.filter((a) => a.patientId === 1);
-  }, []);
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', 'mine'],
+    queryFn: () => appointmentsApi.mine(),
+  });
 
   const now = new Date();
 
   const filteredAppointments = useMemo(() => {
     switch (activeTab) {
       case 'upcoming':
-        return patientAppointments.filter(
+        return appointments.filter(
           (a) =>
             new Date(a.startAt) >= now &&
             !['completed', 'cancelled', 'no_show'].includes(a.status),
         );
       case 'past':
-        return patientAppointments.filter(
+        return appointments.filter(
           (a) =>
             new Date(a.startAt) < now ||
             ['completed', 'cancelled', 'no_show'].includes(a.status),
         );
       case 'all':
-        return patientAppointments;
+        return appointments;
     }
-  }, [activeTab, patientAppointments]);
+  }, [activeTab, appointments]);
 
   return (
     <div className="space-y-6">
@@ -69,7 +70,9 @@ export function AppointmentsPage() {
         ))}
       </div>
 
-      {filteredAppointments.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center py-20 text-gray-400">Загрузка…</div>
+      ) : filteredAppointments.length === 0 ? (
         <EmptyState
           icon={CalendarDays}
           title="Нет записей"
@@ -85,7 +88,7 @@ export function AppointmentsPage() {
         <div className="space-y-4">
           {filteredAppointments.map((appointment) => (
             <AppointmentCard
-              key={appointment.id}
+              key={String(appointment.id)}
               appointment={appointment}
               expandable={
                 appointment.status === 'completed' && !!appointment.visit

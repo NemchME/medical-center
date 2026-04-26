@@ -82,4 +82,28 @@ export class PatientService {
       },
     });
   }
+
+  async findByUserId(userId: number) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+      include: {
+        appointments: {
+          orderBy: { startAt: 'desc' },
+          include: { doctor: true, center: true, visit: true, prediction: true },
+        },
+        testResults: {
+          orderBy: { takenAt: 'desc' },
+          include: { test: true },
+        },
+      },
+    });
+    if (!patient) throw new NotFoundException(`Пациент не найден для пользователя #${userId}`);
+    return patient;
+  }
+
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.patient.delete({ where: { id } });
+    return { success: true };
+  }
 }

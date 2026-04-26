@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MapPin, Phone, Mail } from 'lucide-react';
-import type { ClinicCenter } from '@/data/mock';
+import type { ClinicCenter } from '@/types';
 
 interface CenterCardProps {
   center: ClinicCenter;
@@ -23,25 +23,29 @@ export default function CenterCard({ center, className }: CenterCardProps) {
           <span>{center.address}</span>
         </div>
 
-        <div className="flex items-center gap-2.5 text-sm text-gray-600">
-          <Phone className="h-4 w-4 flex-shrink-0 text-purple-500" />
-          <a
-            href={`tel:${center.phone.replace(/[^\d+]/g, '')}`}
-            className="hover:text-purple-600 hover:underline"
-          >
-            {center.phone}
-          </a>
-        </div>
+        {center.phone && (
+          <div className="flex items-center gap-2.5 text-sm text-gray-600">
+            <Phone className="h-4 w-4 flex-shrink-0 text-purple-500" />
+            <a
+              href={`tel:${center.phone.replace(/[^\d+]/g, '')}`}
+              className="hover:text-purple-600 hover:underline"
+            >
+              {center.phone}
+            </a>
+          </div>
+        )}
 
-        <div className="flex items-center gap-2.5 text-sm text-gray-600">
-          <Mail className="h-4 w-4 flex-shrink-0 text-purple-500" />
-          <a
-            href={`mailto:${center.email}`}
-            className="hover:text-purple-600 hover:underline"
-          >
-            {center.email}
-          </a>
-        </div>
+        {center.email && (
+          <div className="flex items-center gap-2.5 text-sm text-gray-600">
+            <Mail className="h-4 w-4 flex-shrink-0 text-purple-500" />
+            <a
+              href={`mailto:${center.email}`}
+              className="hover:text-purple-600 hover:underline"
+            >
+              {center.email}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

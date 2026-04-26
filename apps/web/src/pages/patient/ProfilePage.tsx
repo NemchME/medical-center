@@ -1,11 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { User, Mail, Phone, MapPin, Save, Check } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { User, Mail, Phone, MapPin, Save, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { USE_MOCK, MOCK_PATIENTS } from '@/data/mock';
+import { authApi } from '@/api/auth';
+import { useAuthStore } from '@/stores/auth.store';
 
 function getInitials(fullName: string): string {
+  if (!fullName) return 'U';
   return fullName
     .split(' ')
     .slice(0, 2)
@@ -15,42 +18,66 @@ function getInitials(fullName: string): string {
 }
 
 export function ProfilePage() {
-  const patient = useMemo(() => {
-    if (USE_MOCK) return MOCK_PATIENTS[0];
-    return null;
-  }, []);
+  const qc = useQueryClient();
+  const setUser = useAuthStore((s) => s.user);
+  const hydrate = useAuthStore((s) => s.hydrate);
 
-  const [form, setForm] = useState({
-    fullName: patient?.fullName ?? '',
-    email: patient?.email ?? '',
-    phone: patient?.phone ?? '',
-    birthDate: patient?.birthDate ?? '',
-    gender: patient?.gender ?? 'male',
-    address: patient?.address ?? '',
+  const { data: me, isLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => authApi.me(),
   });
 
-  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    birthDate: '',
+    gender: 'male',
+    address: '',
+  });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    setSaved(false);
+  useEffect(() => {
+    if (me) {
+      setForm({
+        fullName: me.fullName ?? '',
+        email: me.email ?? '',
+        phone: me.profile?.phone ?? me.patient?.phone ?? '',
+        birthDate: (me.profile?.birthDate ?? me.patient?.birthDate ?? '').slice(0, 10),
+        gender: me.profile?.gender ?? me.patient?.gender ?? 'male',
+        address: me.profile?.address ?? me.patient?.address ?? '',
+      });
+    }
+  }, [me]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      authApi.updateMe({
+        fullName: form.fullName,
+        phone: form.phone,
+        birthDate: form.birthDate || undefined,
+        gender: form.gender,
+        address: form.address,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['me'] });
+      hydrate();
+    },
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    mutation.mutate();
   };
 
-  if (!patient) {
-    return (
-      <div className="text-gray-500 text-center py-12">
-        Не удалось загрузить данные профиля
-      </div>
-    );
+  if (isLoading || !me) {
+    return <div className="text-gray-500 text-center py-12">Загрузка профиля…</div>;
   }
+
+  const saved = mutation.isSuccess && !mutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -64,22 +91,24 @@ export function ProfilePage() {
               {getInitials(form.fullName)}
             </div>
             <div className="flex-1 pt-2 sm:pt-0 sm:pb-1">
-              <h3 className="text-xl font-bold text-gray-900">
-                {form.fullName}
-              </h3>
+              <h3 className="text-xl font-bold text-gray-900">{form.fullName}</h3>
               <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
                 <span className="flex items-center gap-1.5">
                   <Mail className="h-4 w-4" />
                   {form.email}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <Phone className="h-4 w-4" />
-                  {form.phone}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
-                  {form.address}
-                </span>
+                {form.phone && (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="h-4 w-4" />
+                    {form.phone}
+                  </span>
+                )}
+                {form.address && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    {form.address}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -96,12 +125,8 @@ export function ProfilePage() {
         </h3>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          {/* ФИО */}
           <div className="sm:col-span-2">
-            <label
-              htmlFor="fullName"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1.5">
               ФИО
             </label>
             <input
@@ -115,10 +140,7 @@ export function ProfilePage() {
           </div>
 
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
               Email
             </label>
             <input
@@ -126,15 +148,12 @@ export function ProfilePage() {
               name="email"
               type="email"
               value={form.email}
-              onChange={handleChange}
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-900 shadow-sm transition-colors focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
+              disabled
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-500"
             />
           </div>
           <div>
-            <label
-              htmlFor="phone"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
               Телефон
             </label>
             <input
@@ -147,10 +166,7 @@ export function ProfilePage() {
             />
           </div>
           <div>
-            <label
-              htmlFor="birthDate"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="birthDate" className="block text-sm font-medium text-gray-700 mb-1.5">
               Дата рождения
             </label>
             <input
@@ -163,17 +179,12 @@ export function ProfilePage() {
             />
             {form.birthDate && (
               <p className="mt-1 text-xs text-gray-400">
-                {format(new Date(form.birthDate), 'd MMMM yyyy г.', {
-                  locale: ru,
-                })}
+                {format(new Date(form.birthDate), 'd MMMM yyyy г.', { locale: ru })}
               </p>
             )}
           </div>
           <div>
-            <label
-              htmlFor="gender"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-1.5">
               Пол
             </label>
             <select
@@ -189,10 +200,7 @@ export function ProfilePage() {
           </div>
 
           <div className="sm:col-span-2">
-            <label
-              htmlFor="address"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1.5">
               Адрес
             </label>
             <input
@@ -209,8 +217,9 @@ export function ProfilePage() {
         <div className="mt-6 flex items-center gap-3">
           <button
             type="submit"
+            disabled={mutation.isPending}
             className={cn(
-              'inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all',
+              'inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50',
               saved
                 ? 'bg-green-600 hover:bg-green-700'
                 : 'bg-purple-600 hover:bg-purple-700 active:scale-[0.98]',
@@ -224,10 +233,15 @@ export function ProfilePage() {
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Сохранить изменения
+                {mutation.isPending ? 'Сохранение…' : 'Сохранить изменения'}
               </>
             )}
           </button>
+          {mutation.isError && (
+            <span className="inline-flex items-center gap-1 text-sm text-red-600">
+              <AlertCircle className="h-4 w-4" /> Не удалось сохранить
+            </span>
+          )}
         </div>
       </form>
     </div>

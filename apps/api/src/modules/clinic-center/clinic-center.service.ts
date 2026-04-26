@@ -40,4 +40,25 @@ export class ClinicCenterService {
       },
     });
   }
+
+  async update(
+    id: number,
+    dto: {
+      name?: string;
+      address?: string;
+      phone?: string;
+      email?: string;
+      timezone?: string;
+      isActive?: boolean;
+    },
+  ) {
+    await this.findOne(id);
+    return this.prisma.clinicCenter.update({ where: { id }, data: dto });
+  }
+
+  async remove(id: number) {
+    await this.findOne(id);
+    await this.prisma.clinicCenter.update({ where: { id }, data: { isActive: false } });
+    return { success: true };
+  }
 }

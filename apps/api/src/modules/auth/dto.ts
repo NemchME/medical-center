@@ -1,5 +1,6 @@
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '@medicina/shared';
 
 export class LoginDto {
   @ApiProperty({ example: 'user@clinic.ru' })
@@ -31,4 +32,14 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @ApiProperty({ required: false, example: '1990-01-15' })
+  @IsOptional()
+  @IsString()
+  birthDate?: string;
+
+  @ApiProperty({ required: false, enum: UserRole })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }

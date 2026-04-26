@@ -1,30 +1,24 @@
 import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Users,
   AlertTriangle,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  USE_MOCK,
-  MOCK_APPOINTMENTS,
-  MOCK_DOCTORS,
-  type Appointment,
-} from '@/data/mock';
+import { appointmentsApi } from '@/api/appointments';
+import { authApi } from '@/api/auth';
+import type { Appointment } from '@/types';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import NoShowIndicator from '@/components/shared/NoShowIndicator';
 
-const CURRENT_DOCTOR_ID = 1;
-
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 8);
-
 const DAY_NAMES_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -36,13 +30,6 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: 'bg-purple-50 border-purple-300 text-purple-900',
 };
 
-function getAppointmentsData(): Appointment[] {
-  if (USE_MOCK) {
-    return MOCK_APPOINTMENTS.filter((a) => a.doctorId === CURRENT_DOCTOR_ID);
-  }
-  return [];
-}
-
 export function SchedulePage() {
   const today = new Date();
   const [weekStart, setWeekStart] = useState(() =>
@@ -51,16 +38,20 @@ export function SchedulePage() {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
 
-  const appointments = useMemo(() => getAppointmentsData(), []);
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: () => authApi.me() });
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', 'doctor-mine'],
+    queryFn: () => appointmentsApi.mineDoctor(),
+  });
+
+  const doctor = me?.doctor;
+  const schedules = doctor?.schedules ?? [];
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
-
   const weekEnd = addDays(weekStart, 6);
-
-  const doctor = MOCK_DOCTORS.find((d) => d.id === CURRENT_DOCTOR_ID);
 
   const todayAppointments = appointments.filter((a) =>
     isSameDay(new Date(a.startAt), today),
@@ -76,13 +67,11 @@ export function SchedulePage() {
   );
   const noShowCount = appointments.filter((a) => a.status === 'no_show').length;
   const noShowRate =
-    totalDone.length > 0
-      ? Math.round((noShowCount / totalDone.length) * 100)
-      : 0;
+    totalDone.length > 0 ? Math.round((noShowCount / totalDone.length) * 100) : 0;
+
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter(
-      (a) =>
-        isSameDay(new Date(a.startAt), day) && a.status !== 'cancelled',
+      (a) => isSameDay(new Date(a.startAt), day) && a.status !== 'cancelled',
     );
 
   const getBlockStyle = (appointment: Appointment) => {
@@ -95,14 +84,17 @@ export function SchedulePage() {
   };
 
   const getWorkingHours = (day: Date) => {
-    if (!doctor) return null;
-    const dayOfWeek = (day.getDay() + 6) % 7; 
-    return doctor.schedules.find((s) => s.dayOfWeek === dayOfWeek) || null;
+    const dayOfWeek = (day.getDay() + 6) % 7;
+    return schedules.find((s) => s.dayOfWeek === dayOfWeek) || null;
   };
 
   const prevWeek = () => setWeekStart((w) => addDays(w, -7));
   const nextWeek = () => setWeekStart((w) => addDays(w, 7));
   const goToday = () => setWeekStart(startOfWeek(today, { weekStartsOn: 1 }));
+
+  if (isLoading) {
+    return <div className="text-gray-500 text-center py-12">Загрузка расписания…</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -116,23 +108,10 @@ export function SchedulePage() {
         </button>
       </div>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={CalendarDays}
-          value={todayAppointments.length}
-          label="Приёмов сегодня"
-        />
-        <StatCard
-          icon={Clock}
-          value={upcomingCount}
-          label="Предстоящих"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          value={`${noShowRate}%`}
-          label="Процент неявок"
-        />
+        <StatCard icon={CalendarDays} value={todayAppointments.length} label="Приёмов сегодня" />
+        <StatCard icon={Clock} value={upcomingCount} label="Предстоящих" />
+        <StatCard icon={AlertTriangle} value={`${noShowRate}%`} label="Процент неявок" />
       </div>
 
       <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -234,9 +213,7 @@ export function SchedulePage() {
                           key={hour}
                           className={cn(
                             'h-16 border-b border-gray-100',
-                            isWorking
-                              ? 'bg-white'
-                              : 'bg-gray-50/60',
+                            isWorking ? 'bg-white' : 'bg-gray-50/60',
                           )}
                         />
                       );
@@ -247,39 +224,38 @@ export function SchedulePage() {
                       const startTime = format(new Date(apt.startAt), 'HH:mm');
                       return (
                         <button
-                          key={apt.id}
+                          key={String(apt.id)}
                           onClick={() => setSelectedAppointment(apt)}
                           style={style}
                           className={cn(
                             'absolute inset-x-1 z-10 cursor-pointer overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-left transition-shadow hover:shadow-md',
-                            STATUS_COLORS[apt.status] ||
-                              'bg-gray-50 border-gray-300',
+                            STATUS_COLORS[apt.status] || 'bg-gray-50 border-gray-300',
                           )}
                         >
                           <p className="truncate text-xs font-semibold">
-                            {apt.patient.fullName.split(' ').slice(0, 2).join(' ')}
+                            {(apt.patient?.fullName ?? '—').split(' ').slice(0, 2).join(' ')}
                           </p>
                           <p className="text-[10px] opacity-75">{startTime}</p>
                         </button>
                       );
                     })}
 
-                    {/* Current time indicator */}
-                    {isToday && (() => {
-                      const nowHour = today.getHours();
-                      const nowMin = today.getMinutes();
-                      if (nowHour < 8 || nowHour > 20) return null;
-                      const topPx = (nowHour - 8) * 64 + (nowMin / 60) * 64;
-                      return (
-                        <div
-                          className="absolute left-0 right-0 z-20 flex items-center"
-                          style={{ top: `${topPx}px` }}
-                        >
-                          <div className="h-2.5 w-2.5 rounded-full bg-purple-600" />
-                          <div className="h-[2px] flex-1 bg-purple-600" />
-                        </div>
-                      );
-                    })()}
+                    {isToday &&
+                      (() => {
+                        const nowHour = today.getHours();
+                        const nowMin = today.getMinutes();
+                        if (nowHour < 8 || nowHour > 20) return null;
+                        const topPx = (nowHour - 8) * 64 + (nowMin / 60) * 64;
+                        return (
+                          <div
+                            className="absolute left-0 right-0 z-20 flex items-center"
+                            style={{ top: `${topPx}px` }}
+                          >
+                            <div className="h-2.5 w-2.5 rounded-full bg-purple-600" />
+                            <div className="h-[2px] flex-1 bg-purple-600" />
+                          </div>
+                        );
+                      })()}
                   </div>
                 );
               })}
@@ -292,9 +268,7 @@ export function SchedulePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">
-                Детали приёма
-              </h3>
+              <h3 className="text-lg font-bold text-gray-900">Детали приёма</h3>
               <button
                 onClick={() => setSelectedAppointment(null)}
                 className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
@@ -307,15 +281,15 @@ export function SchedulePage() {
               <div className="rounded-xl bg-purple-50 p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-200 font-bold text-purple-700">
-                    {selectedAppointment.patient.fullName.charAt(0)}
+                    {(selectedAppointment.patient?.fullName ?? 'U').charAt(0)}
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">
-                      {selectedAppointment.patient.fullName}
+                      {selectedAppointment.patient?.fullName ?? '—'}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      {selectedAppointment.patient.phone}
-                    </p>
+                    {selectedAppointment.patient?.phone && (
+                      <p className="text-sm text-gray-500">{selectedAppointment.patient.phone}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -324,15 +298,11 @@ export function SchedulePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Дата и время</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {format(new Date(selectedAppointment.startAt), 'd MMMM yyyy, HH:mm', {
-                      locale: ru,
-                    })}
+                    {format(new Date(selectedAppointment.startAt), 'd MMMM yyyy, HH:mm', { locale: ru })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">
-                    Длительность
-                  </span>
+                  <span className="text-sm text-gray-500">Длительность</span>
                   <span className="text-sm font-medium text-gray-900">
                     {selectedAppointment.durationMin} мин
                   </span>
@@ -341,21 +311,19 @@ export function SchedulePage() {
                   <span className="text-sm text-gray-500">Статус</span>
                   <StatusBadge status={selectedAppointment.status} />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Канал записи</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {selectedAppointment.sourceChannel}
-                  </span>
-                </div>
+                {selectedAppointment.sourceChannel && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Канал записи</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {selectedAppointment.sourceChannel}
+                    </span>
+                  </div>
+                )}
                 {selectedAppointment.prediction && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                      Риск неявки
-                    </span>
+                    <span className="text-sm text-gray-500">Риск неявки</span>
                     <NoShowIndicator
-                      probability={
-                        selectedAppointment.prediction.noShowProbability
-                      }
+                      probability={selectedAppointment.prediction.noShowProbability}
                     />
                   </div>
                 )}
@@ -363,18 +331,20 @@ export function SchedulePage() {
 
               {selectedAppointment.visit && (
                 <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                  <p className="mb-2 text-sm font-semibold text-green-800">
-                    Результат визита
-                  </p>
+                  <p className="mb-2 text-sm font-semibold text-green-800">Результат визита</p>
                   <div className="space-y-1 text-sm text-green-900">
-                    <p>
-                      <span className="font-medium">Жалобы:</span>{' '}
-                      {selectedAppointment.visit.complaints}
-                    </p>
-                    <p>
-                      <span className="font-medium">Диагноз:</span>{' '}
-                      {selectedAppointment.visit.diagnosis}
-                    </p>
+                    {selectedAppointment.visit.complaints && (
+                      <p>
+                        <span className="font-medium">Жалобы:</span>{' '}
+                        {selectedAppointment.visit.complaints}
+                      </p>
+                    )}
+                    {selectedAppointment.visit.diagnosis && (
+                      <p>
+                        <span className="font-medium">Диагноз:</span>{' '}
+                        {selectedAppointment.visit.diagnosis}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

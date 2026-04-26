@@ -1,65 +1,21 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
-import {
-  USE_MOCK,
-  MOCK_APPOINTMENTS,
-  MOCK_PATIENTS,
-  type Patient,
-  type Appointment,
-} from '@/data/mock';
+import { appointmentsApi } from '@/api/appointments';
+import type { ID } from '@/types';
 import StatCard from '@/components/ui/StatCard';
 import DataTable, { type Column } from '@/components/ui/DataTable';
 import SearchInput from '@/components/ui/SearchInput';
 
-const CURRENT_DOCTOR_ID = 1;
-
 interface PatientRow extends Record<string, unknown> {
-  id: number;
+  id: ID;
   fullName: string;
-  birthDate: string;
-  phone: string;
-  email: string;
+  birthDate?: string | null;
+  phone?: string | null;
+  email?: string | null;
   lastVisit: string | null;
-}
-
-function getDoctorPatients(): PatientRow[] {
-  if (!USE_MOCK) return [];
-
-  const doctorAppointments = MOCK_APPOINTMENTS.filter(
-    (a) => a.doctorId === CURRENT_DOCTOR_ID,
-  );
-
-  const patientIds = [...new Set(doctorAppointments.map((a) => a.patientId))];
-
-  return patientIds
-    .map((pid) => {
-      const patient = MOCK_PATIENTS.find((p) => p.id === pid);
-      if (!patient) return null;
-
-      const patientAppointments = doctorAppointments
-        .filter((a) => a.patientId === pid && a.status === 'completed')
-        .sort(
-          (a, b) =>
-            new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
-        );
-
-      const lastVisit =
-        patientAppointments.length > 0
-          ? patientAppointments[0].startAt
-          : null;
-
-      return {
-        id: patient.id,
-        fullName: patient.fullName,
-        birthDate: patient.birthDate,
-        phone: patient.phone,
-        email: patient.email,
-        lastVisit,
-      } as PatientRow;
-    })
-    .filter(Boolean) as PatientRow[];
 }
 
 const columns: Column<PatientRow>[] = [
@@ -81,27 +37,30 @@ const columns: Column<PatientRow>[] = [
     header: 'Дата рождения',
     sortable: true,
     render: (row) =>
-      format(new Date(row.birthDate), 'd MMMM yyyy', { locale: ru }),
+      row.birthDate
+        ? format(new Date(row.birthDate), 'd MMMM yyyy', { locale: ru })
+        : '—',
   },
   {
     key: 'phone',
     header: 'Телефон',
-    render: (row) => (
-      <span className="text-gray-600">{row.phone}</span>
-    ),
+    render: (row) => <span className="text-gray-600">{row.phone ?? '—'}</span>,
   },
   {
     key: 'email',
     header: 'Email',
-    render: (row) => (
-      <a
-        href={`mailto:${row.email}`}
-        className="text-purple-600 hover:text-purple-800 hover:underline"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {row.email}
-      </a>
-    ),
+    render: (row) =>
+      row.email ? (
+        <a
+          href={`mailto:${row.email}`}
+          className="text-purple-600 hover:text-purple-800 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.email}
+        </a>
+      ) : (
+        <span className="text-gray-400">—</span>
+      ),
   },
   {
     key: 'lastVisit',
@@ -110,9 +69,7 @@ const columns: Column<PatientRow>[] = [
     render: (row) =>
       row.lastVisit ? (
         <span className="text-gray-700">
-          {format(new Date(row.lastVisit as string), 'd MMM yyyy', {
-            locale: ru,
-          })}
+          {format(new Date(row.lastVisit), 'd MMM yyyy', { locale: ru })}
         </span>
       ) : (
         <span className="text-gray-400">Нет визитов</span>
@@ -123,7 +80,35 @@ const columns: Column<PatientRow>[] = [
 export function DoctorPatientsPage() {
   const [search, setSearch] = useState('');
 
-  const allPatients = useMemo(() => getDoctorPatients(), []);
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', 'doctor-mine'],
+    queryFn: () => appointmentsApi.mineDoctor(),
+  });
+
+  const allPatients = useMemo<PatientRow[]>(() => {
+    const byPatient = new Map<string, PatientRow>();
+    for (const apt of appointments) {
+      if (!apt.patient) continue;
+      const key = String(apt.patient.id);
+      const completed =
+        apt.status === 'completed' ? new Date(apt.startAt).toISOString() : null;
+
+      const prev = byPatient.get(key);
+      if (!prev) {
+        byPatient.set(key, {
+          id: apt.patient.id,
+          fullName: apt.patient.fullName,
+          birthDate: apt.patient.birthDate,
+          phone: apt.patient.phone,
+          email: apt.patient.email,
+          lastVisit: completed,
+        });
+      } else if (completed && (!prev.lastVisit || completed > prev.lastVisit)) {
+        byPatient.set(key, { ...prev, lastVisit: completed });
+      }
+    }
+    return Array.from(byPatient.values());
+  }, [appointments]);
 
   const filteredPatients = useMemo(() => {
     if (!search.trim()) return allPatients;
@@ -131,37 +116,28 @@ export function DoctorPatientsPage() {
     return allPatients.filter(
       (p) =>
         p.fullName.toLowerCase().includes(q) ||
-        p.phone.includes(q) ||
-        p.email.toLowerCase().includes(q),
+        (p.phone ?? '').includes(q) ||
+        (p.email ?? '').toLowerCase().includes(q),
     );
   }, [allPatients, search]);
 
-  const [selectedPatient, setSelectedPatient] = useState<PatientRow | null>(
-    null,
-  );
+  const [selectedPatient, setSelectedPatient] = useState<PatientRow | null>(null);
 
   const patientAppointments = useMemo(() => {
     if (!selectedPatient) return [];
-    return MOCK_APPOINTMENTS.filter(
-      (a) =>
-        a.patientId === selectedPatient.id &&
-        a.doctorId === CURRENT_DOCTOR_ID,
-    ).sort(
-      (a, b) =>
-        new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
-    );
-  }, [selectedPatient]);
+    return appointments
+      .filter((a) => String(a.patientId) === String(selectedPatient.id))
+      .sort(
+        (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+      );
+  }, [selectedPatient, appointments]);
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Мои пациенты</h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={Users}
-          value={allPatients.length}
-          label="Всего пациентов"
-        />
+        <StatCard icon={Users} value={allPatients.length} label="Всего пациентов" />
       </div>
 
       <SearchInput
@@ -171,20 +147,22 @@ export function DoctorPatientsPage() {
         className="max-w-md"
       />
 
-      <DataTable
-        data={filteredPatients}
-        columns={columns}
-        onRowClick={(row) => setSelectedPatient(row)}
-        emptyMessage="Пациенты не найдены"
-      />
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-500">Загрузка…</div>
+      ) : (
+        <DataTable
+          data={filteredPatients}
+          columns={columns}
+          onRowClick={(row) => setSelectedPatient(row as PatientRow)}
+          emptyMessage="Пациенты не найдены"
+        />
+      )}
 
       {selectedPatient && (
         <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/30 backdrop-blur-sm">
           <div className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">
-                Карточка пациента
-              </h3>
+              <h3 className="text-lg font-bold text-gray-900">Карточка пациента</h3>
               <button
                 onClick={() => setSelectedPatient(null)}
                 className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
@@ -200,16 +178,14 @@ export function DoctorPatientsPage() {
                   {selectedPatient.fullName.charAt(0)}
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-gray-900">
-                    {selectedPatient.fullName}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {format(
-                      new Date(selectedPatient.birthDate),
-                      'd MMMM yyyy',
-                      { locale: ru },
-                    )}
-                  </p>
+                  <p className="text-lg font-bold text-gray-900">{selectedPatient.fullName}</p>
+                  {selectedPatient.birthDate && (
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(selectedPatient.birthDate), 'd MMMM yyyy', {
+                        locale: ru,
+                      })}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -221,13 +197,13 @@ export function DoctorPatientsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Телефон</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {selectedPatient.phone}
+                    {selectedPatient.phone ?? '—'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Email</span>
                   <span className="text-sm font-medium text-purple-600">
-                    {selectedPatient.email}
+                    {selectedPatient.email ?? '—'}
                   </span>
                 </div>
               </div>
@@ -243,17 +219,10 @@ export function DoctorPatientsPage() {
               ) : (
                 <div className="space-y-2">
                   {patientAppointments.map((apt) => (
-                    <div
-                      key={apt.id}
-                      className="rounded-xl border border-gray-200 p-4"
-                    >
+                    <div key={String(apt.id)} className="rounded-xl border border-gray-200 p-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">
-                          {format(
-                            new Date(apt.startAt),
-                            'd MMM yyyy, HH:mm',
-                            { locale: ru },
-                          )}
+                          {format(new Date(apt.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
                         </span>
                         <span
                           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
@@ -279,14 +248,11 @@ export function DoctorPatientsPage() {
                                   : apt.status}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {apt.durationMin} мин
-                      </p>
-                      {apt.visit && (
+                      <p className="mt-1 text-sm text-gray-500">{apt.durationMin} мин</p>
+                      {apt.visit?.diagnosis && (
                         <div className="mt-2 rounded-lg bg-green-50 p-2 text-sm text-green-800">
                           <p>
-                            <span className="font-medium">Диагноз:</span>{' '}
-                            {apt.visit.diagnosis}
+                            <span className="font-medium">Диагноз:</span> {apt.visit.diagnosis}
                           </p>
                         </div>
                       )}

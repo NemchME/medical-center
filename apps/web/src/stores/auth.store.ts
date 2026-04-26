@@ -1,50 +1,63 @@
 import { create } from 'zustand';
-import { api } from '@/services/api';
-import { USE_MOCK, MOCK_CURRENT_USER } from '@/data/mock';
+import { authApi } from '@/api/auth';
+import type { User } from '@/types';
 
-interface User {
-  id: number;
-  email: string;
-  fullName: string;
-  roles?: string[];
-}
+export type AppRole = 'patient' | 'doctor' | 'admin' | 'manager';
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  role: 'patient' | 'doctor' | 'admin';
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; fullName: string }) => Promise<void>;
+  register: (data: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone?: string;
+    birthDate?: string;
+    role?: AppRole;
+  }) => Promise<void>;
   logout: () => void;
-  setRole: (role: 'patient' | 'doctor' | 'admin') => void;
+  hydrate: () => Promise<void>;
+}
+
+function primaryRole(roles: string[] | undefined): AppRole {
+  if (!roles?.length) return 'patient';
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('manager')) return 'manager';
+  if (roles.includes('doctor')) return 'doctor';
+  return 'patient';
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: USE_MOCK ? MOCK_CURRENT_USER : null,
-  isAuthenticated: USE_MOCK ? true : !!localStorage.getItem('accessToken'),
-  role: (localStorage.getItem('mockRole') as 'patient' | 'doctor' | 'admin') || 'patient',
+  user: null,
+  isAuthenticated: !!localStorage.getItem('accessToken'),
+  isLoading: false,
 
   login: async (email, password) => {
-    if (USE_MOCK) {
-      set({ user: MOCK_CURRENT_USER, isAuthenticated: true });
-      return;
+    set({ isLoading: true });
+    try {
+      const res = await authApi.login(email, password);
+      localStorage.setItem('accessToken', res.accessToken);
+      const me = await authApi.me();
+      set({ user: me, isAuthenticated: true, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
     }
-    const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('accessToken', data.accessToken);
-    set({ user: data.user, isAuthenticated: true });
   },
 
   register: async (dto) => {
-    if (USE_MOCK) {
-      set({
-        user: { id: 99, email: dto.email, fullName: dto.fullName, roles: ['patient'] },
-        isAuthenticated: true,
-      });
-      return;
+    set({ isLoading: true });
+    try {
+      const res = await authApi.register(dto);
+      localStorage.setItem('accessToken', res.accessToken);
+      const me = await authApi.me();
+      set({ user: me, isAuthenticated: true, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
     }
-    const { data } = await api.post('/auth/register', dto);
-    localStorage.setItem('accessToken', data.accessToken);
-    set({ user: data.user, isAuthenticated: true });
   },
 
   logout: () => {
@@ -52,8 +65,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false });
   },
 
-  setRole: (role) => {
-    localStorage.setItem('mockRole', role);
-    set({ role });
+  hydrate: async () => {
+    if (!localStorage.getItem('accessToken')) return;
+    set({ isLoading: true });
+    try {
+      const me = await authApi.me();
+      set({ user: me, isAuthenticated: true, isLoading: false });
+    } catch {
+      localStorage.removeItem('accessToken');
+      set({ user: null, isAuthenticated: false, isLoading: false });
+    }
   },
 }));
+
+export function useCurrentRole(): AppRole {
+  const user = useAuthStore((s) => s.user);
+  return primaryRole(user?.roles);
+}

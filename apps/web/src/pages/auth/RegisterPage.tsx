@@ -29,10 +29,10 @@ export function RegisterPage() {
     setError('');
     setIsLoading(true);
     try {
-      await register({ email, password, fullName });
+      await register({ email, password, fullName, phone, birthDate });
       navigate('/patient/appointments');
-    } catch {
-      setError('Ошибка регистрации. Возможно, email уже занят.');
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Ошибка регистрации. Возможно, email уже занят.');
     } finally {
       setIsLoading(false);
     }

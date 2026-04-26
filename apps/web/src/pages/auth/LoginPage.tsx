@@ -18,9 +18,17 @@ export function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
-      navigate('/patient/appointments');
-    } catch {
-      setError('Неверный email или пароль');
+      const user = useAuthStore.getState().user;
+      const roles = user?.roles ?? [];
+      if (roles.includes('admin') || roles.includes('manager')) {
+        navigate('/admin/patients');
+      } else if (roles.includes('doctor')) {
+        navigate('/doctor/schedule');
+      } else {
+        navigate('/patient/appointments');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Неверный email или пароль');
     } finally {
       setIsLoading(false);
     }

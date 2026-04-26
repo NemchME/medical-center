@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Clock } from 'lucide-react';
-import type { Service } from '@/data/mock';
+import type { Service } from '@/types';
 
 interface ServiceCardProps {
   service: Service;
@@ -8,8 +8,9 @@ interface ServiceCardProps {
 }
 
 export default function ServiceCard({ service, className }: ServiceCardProps) {
-  const minPrice = service.prices.length
-    ? Math.min(...service.prices.map((p) => p.price))
+  const prices = service.prices ?? [];
+  const minPrice = prices.length
+    ? Math.min(...prices.map((p) => Number(p.price)))
     : null;
 
   return (

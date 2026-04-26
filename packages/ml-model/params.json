@@ -1,0 +1,27 @@
+{
+  "model_version": "v1.0-gb",
+  "algorithm": "GradientBoostingClassifier",
+  "pipeline_steps": [
+    "StandardScaler",
+    "GradientBoostingClassifier"
+  ],
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    "min_samples_split": 20,
+    "min_samples_leaf": 10,
+    "random_state": 42
+  },
+  "features": [
+    "day_of_week",
+    "hour_of_day",
+    "lead_time_days",
+    "patient_age",
+    "previous_visits",
+    "previous_no_shows",
+    "no_show_rate",
+    "source_channel"
+  ],
+  "onnx_opset": 12
+}

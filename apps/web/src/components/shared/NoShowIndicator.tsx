@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 interface NoShowIndicatorProps {
-  probability: number; // 0-1 scale
+  probability: number; 
   className?: string;
 }
 

@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 import { FlaskConical, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { USE_MOCK, MOCK_TEST_RESULTS } from '@/data/mock';
-import type { TestResult } from '@/data/mock';
+import { testResultsApi } from '@/api/test-results';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 
-function isOutOfRange(result: string, refRange: string): boolean {
+function isOutOfRange(result: string, refRange?: string | null): boolean {
   if (!result || !refRange) return false;
 
   const numResult = parseFloat(result);
@@ -35,13 +35,21 @@ function isOutOfRange(result: string, refRange: string): boolean {
 }
 
 export function TestResultsPage() {
-  const testResults = useMemo(() => {
-    if (!USE_MOCK) return [];
-    return MOCK_TEST_RESULTS.filter((t) => t.patientId === 1).sort(
-      (a, b) =>
-        new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime(),
-    );
-  }, []);
+  const { data: raw = [], isLoading } = useQuery({
+    queryKey: ['test-results', 'mine'],
+    queryFn: () => testResultsApi.mine(),
+  });
+  const testResults = useMemo(
+    () =>
+      [...raw].sort(
+        (a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime(),
+      ),
+    [raw],
+  );
+
+  if (isLoading) {
+    return <div className="text-gray-500 text-center py-12">Загрузка…</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -69,7 +77,7 @@ export function TestResultsPage() {
 
             return (
               <div
-                key={tr.id}
+                key={String(tr.id)}
                 className={cn(
                   'rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md',
                   outOfRange
@@ -81,7 +89,7 @@ export function TestResultsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-base font-semibold text-gray-900">
-                        {tr.test.name}
+                        {tr.test?.name ?? '—'}
                       </h3>
                       {isPending ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-300 bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
@@ -93,9 +101,11 @@ export function TestResultsPage() {
                       )}
                     </div>
 
-                    <p className="mt-1 text-sm text-gray-500">
-                      {tr.test.description}
-                    </p>
+                    {tr.test?.description && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {tr.test.description}
+                      </p>
+                    )}
 
                     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                       <span className="text-gray-500">
@@ -116,12 +126,12 @@ export function TestResultsPage() {
                           </span>
                         </span>
                       )}
-                      <span className="text-gray-500">
-                        Биоматериал:{' '}
-                        <span className="text-gray-700">
-                          {tr.test.sampleType}
+                      {tr.test?.sampleType && (
+                        <span className="text-gray-500">
+                          Биоматериал:{' '}
+                          <span className="text-gray-700">{tr.test.sampleType}</span>
                         </span>
-                      </span>
+                      )}
                     </div>
                   </div>
 

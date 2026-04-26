@@ -1,5 +1,15 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/stores/auth.store';
+import {
+  Outlet,
+  Link,
+  useLocation,
+  useNavigate,
+  Navigate,
+} from "react-router-dom";
+import {
+  useAuthStore,
+  useCurrentRole,
+  type AppRole,
+} from "@/stores/auth.store";
 import {
   Calendar,
   ClipboardList,
@@ -10,10 +20,12 @@ import {
   FileText,
   TestTubes,
   LogOut,
-  ChevronDown,
-} from 'lucide-react';
-import { useState } from 'react';
-import { cn } from '@/lib/utils';
+  Bell,
+  Building2,
+  FlaskConical,
+} from "lucide-react";
+import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 interface SidebarLink {
   to: string;
@@ -22,43 +34,73 @@ interface SidebarLink {
 }
 
 const patientLinks: SidebarLink[] = [
-  { to: '/patient/profile', label: 'Профиль', icon: User },
-  { to: '/patient/appointments', label: 'Мои записи', icon: ClipboardList },
-  { to: '/patient/med-card', label: 'Медицинская карта', icon: FileText },
-  { to: '/patient/prescriptions', label: 'Рецепты', icon: Stethoscope },
-  { to: '/patient/test-results', label: 'Результаты анализов', icon: TestTubes },
+  { to: "/patient/profile", label: "Профиль", icon: User },
+  { to: "/patient/appointments", label: "Мои записи", icon: ClipboardList },
+  { to: "/patient/med-card", label: "Медицинская карта", icon: FileText },
+  { to: "/patient/prescriptions", label: "Рецепты", icon: Stethoscope },
+  {
+    to: "/patient/test-results",
+    label: "Результаты анализов",
+    icon: TestTubes,
+  },
 ];
 
 const doctorLinks: SidebarLink[] = [
-  { to: '/doctor/schedule', label: 'Расписание', icon: Calendar },
-  { to: '/doctor/patients', label: 'Пациенты', icon: Users },
-  { to: '/doctor/profile', label: 'Профиль', icon: User },
+  { to: "/doctor/schedule", label: "Расписание", icon: Calendar },
+  { to: "/doctor/patients", label: "Пациенты", icon: Users },
+  { to: "/doctor/profile", label: "Профиль", icon: User },
 ];
 
 const adminLinks: SidebarLink[] = [
-  { to: '/admin/patients', label: 'Пациенты', icon: Users },
-  { to: '/admin/appointments', label: 'Записи на приёмы', icon: ClipboardList },
-  { to: '/admin/doctors', label: 'Врачи', icon: Stethoscope },
-  { to: '/admin/analytics', label: 'Аналитика', icon: BarChart3 },
+  { to: "/admin/patients", label: "Пациенты", icon: Users },
+  { to: "/admin/appointments", label: "Записи на приёмы", icon: ClipboardList },
+  { to: "/admin/doctors", label: "Врачи", icon: Stethoscope },
+  { to: "/admin/centers", label: "Клиники", icon: Building2 },
+  { to: "/admin/services", label: "Услуги и анализы", icon: FlaskConical },
+  { to: "/admin/analytics", label: "Аналитика", icon: BarChart3 },
+  { to: "/admin/notifications", label: "Уведомления", icon: Bell },
 ];
 
-const roleLabels = {
-  patient: 'Пациент',
-  doctor: 'Врач',
-  admin: 'Администратор',
+const roleLabels: Record<AppRole, string> = {
+  patient: "Пациент",
+  doctor: "Врач",
+  admin: "Администратор",
+  manager: "Менеджер",
 };
+
+function linksByRole(role: AppRole): SidebarLink[] {
+  if (role === "admin" || role === "manager") return adminLinks;
+  if (role === "doctor") return doctorLinks;
+  return patientLinks;
+}
 
 export function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, role, setRole } = useAuthStore();
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const { user, isAuthenticated, isLoading, logout, hydrate } = useAuthStore();
+  const role = useCurrentRole();
 
-  const links = role === 'admin' ? adminLinks : role === 'doctor' ? doctorLinks : patientLinks;
+  useEffect(() => {
+    if (isAuthenticated && !user) hydrate();
+  }, [isAuthenticated, user, hydrate]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (isLoading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Загрузка…
+      </div>
+    );
+  }
+
+  const links = linksByRole(role);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -71,37 +113,13 @@ export function DashboardLayout() {
           <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center text-sm font-bold">
             M
           </div>
-          <span className="text-xl font-bold tracking-tight">Medecina</span>
+          <span className="text-xl font-bold tracking-tight">medicina</span>
         </Link>
 
-        <div className="px-4 pt-4 pb-2 relative">
-          <button
-            onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors"
-          >
-            <span className="text-white/70">{roleLabels[role]}</span>
-            <ChevronDown className={cn('w-4 h-4 text-white/50 transition-transform', roleMenuOpen && 'rotate-180')} />
-          </button>
-          {roleMenuOpen && (
-            <div className="absolute left-4 right-4 top-full mt-1 bg-gray-800 rounded-lg shadow-xl border border-white/10 overflow-hidden z-30 animate-fade-in">
-              {(['patient', 'doctor', 'admin'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => {
-                    setRole(r);
-                    setRoleMenuOpen(false);
-                    navigate(r === 'admin' ? '/admin/patients' : r === 'doctor' ? '/doctor/schedule' : '/patient/profile');
-                  }}
-                  className={cn(
-                    'w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors',
-                    role === r ? 'text-primary-400 bg-white/5' : 'text-white/70',
-                  )}
-                >
-                  {roleLabels[r]}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="px-4 pt-4 pb-2">
+          <div className="w-full px-3 py-2 rounded-lg bg-white/5 text-sm text-white/70">
+            {roleLabels[role]}
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto scrollbar-thin">
@@ -113,10 +131,10 @@ export function DashboardLayout() {
                 key={link.to}
                 to={link.to}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                   isActive
-                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5',
+                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/30"
+                    : "text-gray-400 hover:text-white hover:bg-white/5",
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -129,10 +147,12 @@ export function DashboardLayout() {
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-bold">
-              {user?.fullName?.charAt(0) || 'U'}
+              {user?.fullName?.charAt(0) || "U"}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.fullName || 'Пользователь'}</p>
+              <p className="text-sm font-medium truncate">
+                {user?.fullName || "Пользователь"}
+              </p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
           </div>

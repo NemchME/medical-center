@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { TestTube, AlertCircle } from 'lucide-react';
-import type { LabTest } from '@/data/mock';
+import type { LabTest } from '@/types';
 
 interface TestCardProps {
   test: LabTest;
@@ -8,8 +8,9 @@ interface TestCardProps {
 }
 
 export default function TestCard({ test, className }: TestCardProps) {
-  const minPrice = test.prices.length
-    ? Math.min(...test.prices.map((p) => p.price))
+  const prices = test.prices ?? [];
+  const minPrice = prices.length
+    ? Math.min(...prices.map((p) => Number(p.price)))
     : null;
 
   return (
@@ -28,14 +29,18 @@ export default function TestCard({ test, className }: TestCardProps) {
         )}
       </div>
 
-      <p className="mt-1.5 text-sm text-gray-500">{test.description}</p>
+      {test.description && (
+        <p className="mt-1.5 text-sm text-gray-500">{test.description}</p>
+      )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
-          <TestTube className="h-3.5 w-3.5" />
-          {test.sampleType}
-        </span>
-      </div>
+      {test.sampleType && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+            <TestTube className="h-3.5 w-3.5" />
+            {test.sampleType}
+          </span>
+        </div>
+      )}
 
       {test.preparation && (
         <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
