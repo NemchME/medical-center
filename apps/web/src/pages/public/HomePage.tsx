@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Users,
   Building2,
@@ -10,10 +11,19 @@ import {
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
-import { MOCK_DOCTORS, MOCK_CENTERS } from '@/data/mock';
+import { doctorsApi } from '@/api/doctors';
+import { centersApi } from '@/api/centers';
 import DoctorCard from '@/components/shared/DoctorCard';
 import CenterCard from '@/components/shared/CenterCard';
+import { useAuthStore, useCurrentRole, type AppRole } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
+
+const dashboardHomeByRole: Record<AppRole, string> = {
+  patient: '/patient/appointments',
+  doctor: '/doctor/schedule',
+  admin: '/admin/patients',
+  manager: '/admin/patients',
+};
 
 const stats = [
   { icon: Users, value: '50+', label: 'врачей' },
@@ -41,11 +51,27 @@ const features = [
 ];
 
 export function HomePage() {
-  const topDoctors = MOCK_DOCTORS.slice(0, 3);
+  const { data: doctors = [] } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: () => doctorsApi.list(),
+  });
+  const { data: centers = [] } = useQuery({
+    queryKey: ['centers'],
+    queryFn: () => centersApi.list(),
+  });
+  const topDoctors = doctors.slice(0, 3);
+
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const role = useCurrentRole();
+  const dashboardLink = dashboardHomeByRole[role];
+
+  // Для залогиненного — ведём в кабинет; для гостя — на регистрацию
+  const primaryCtaLink = isAuthenticated ? dashboardLink : '/register';
+  const primaryCtaLabel = isAuthenticated ? 'Перейти в кабинет' : 'Записаться на приём';
 
   return (
     <>
-      <section className="relative bg-cosmic overflow-hidden pb-6">
+      <section className="relative bg-cosmic overflow-hidden min-h-screen">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-primary-500/10 blur-3xl" />
           <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-primary-400/10 blur-3xl" />
@@ -73,7 +99,7 @@ export function HomePage() {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              to="/register"
+              to={primaryCtaLink}
               className={cn(
                 'inline-flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold',
                 'bg-primary-500 hover:bg-primary-400 text-white',
@@ -81,7 +107,7 @@ export function HomePage() {
                 'transform hover:-translate-y-0.5 transition-all duration-300',
               )}
             >
-              Записаться на приём
+              {primaryCtaLabel}
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
@@ -97,7 +123,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-4 -mb16">
+        <div className="relative max-w-5xl mx-auto px-4 -mb-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {stats.map((stat) => (
               <div
@@ -164,7 +190,7 @@ export function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {topDoctors.map((doctor) => (
-              <DoctorCard key={doctor.id} doctor={doctor} />
+              <DoctorCard key={String(doctor.id)} doctor={doctor} />
             ))}
           </div>
 
@@ -188,8 +214,8 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {MOCK_CENTERS.map((center) => (
-              <CenterCard key={center.id} center={center} />
+            {centers.map((center) => (
+              <CenterCard key={String(center.id)} center={center} />
             ))}
           </div>
         </div>
@@ -198,13 +224,17 @@ export function HomePage() {
       <section className="bg-cosmic py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-            Начните заботиться о здоровье сегодня
+            {isAuthenticated
+              ? 'Готовы записаться на приём?'
+              : 'Начните заботиться о здоровье сегодня'}
           </h2>
           <p className="mt-4 text-lg text-white/60 max-w-xl mx-auto">
-            Зарегистрируйтесь и запишитесь на приём к нужному специалисту за пару минут
+            {isAuthenticated
+              ? 'Перейдите в личный кабинет — все ваши записи, рецепты и результаты в одном месте.'
+              : 'Зарегистрируйтесь и запишитесь на приём к нужному специалисту за пару минут'}
           </p>
           <Link
-            to="/register"
+            to={isAuthenticated ? dashboardLink : '/register'}
             className={cn(
               'mt-8 inline-flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold',
               'bg-white text-primary-600 hover:bg-primary-50',
@@ -212,7 +242,7 @@ export function HomePage() {
               'transform hover:-translate-y-0.5 transition-all duration-300',
             )}
           >
-            Создать аккаунт
+            {isAuthenticated ? 'Перейти в кабинет' : 'Создать аккаунт'}
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>

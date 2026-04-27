@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search, Stethoscope } from 'lucide-react';
-import { MOCK_DOCTORS } from '@/data/mock';
+import { doctorsApi } from '@/api/doctors';
 import DoctorCard from '@/components/shared/DoctorCard';
 import { cn } from '@/lib/utils';
 
@@ -10,13 +11,20 @@ export function DoctorsPage() {
   const [activeSpec, setActiveSpec] = useState(ALL_FILTER);
   const [search, setSearch] = useState('');
 
+  const { data: doctors = [], isLoading } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: () => doctorsApi.list(),
+  });
+
   const specializations = useMemo(() => {
-    const specs = Array.from(new Set(MOCK_DOCTORS.map((d) => d.specialization)));
+    const specs = Array.from(
+      new Set(doctors.map((d) => d.specialization).filter(Boolean) as string[]),
+    );
     return [ALL_FILTER, ...specs.sort()];
-  }, []);
+  }, [doctors]);
 
   const filtered = useMemo(() => {
-    let list = MOCK_DOCTORS;
+    let list = doctors;
     if (activeSpec !== ALL_FILTER) {
       list = list.filter((d) => d.specialization === activeSpec);
     }
@@ -25,12 +33,12 @@ export function DoctorsPage() {
       list = list.filter(
         (d) =>
           d.fullName.toLowerCase().includes(q) ||
-          d.specialization.toLowerCase().includes(q) ||
-          d.center.name.toLowerCase().includes(q),
+          (d.specialization ?? '').toLowerCase().includes(q) ||
+          (d.center?.name ?? '').toLowerCase().includes(q),
       );
     }
     return list;
-  }, [activeSpec, search]);
+  }, [doctors, activeSpec, search]);
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -38,7 +46,7 @@ export function DoctorsPage() {
         <div className="max-w-7xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-primary-200 text-sm font-medium px-4 py-2 rounded-full mb-6 border border-white/10">
             <Stethoscope className="w-4 h-4" />
-            {MOCK_DOCTORS.length} специалистов
+            {doctors.length} специалистов
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white">Наши врачи</h1>
           <p className="mt-4 text-lg text-white/60 max-w-2xl mx-auto">
@@ -83,7 +91,9 @@ export function DoctorsPage() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-20 text-gray-400">Загрузка…</div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <Stethoscope className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg">Врачи не найдены</p>
@@ -92,7 +102,7 @@ export function DoctorsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filtered.map((doctor) => (
-              <DoctorCard key={doctor.id} doctor={doctor} />
+              <DoctorCard key={String(doctor.id)} doctor={doctor} />
             ))}
           </div>
         )}

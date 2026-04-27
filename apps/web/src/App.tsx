@@ -24,6 +24,7 @@ import { TestResultsPage } from '@/pages/patient/TestResultsPage';
 import { SchedulePage } from '@/pages/doctor/SchedulePage';
 import { DoctorPatientsPage } from '@/pages/doctor/DoctorPatientsPage';
 import { DoctorProfilePage } from '@/pages/doctor/DoctorProfilePage';
+import { VisitPage } from '@/pages/doctor/VisitPage';
 
 import { AdminPatientsPage } from '@/pages/admin/AdminPatientsPage';
 import { AdminAppointmentsPage } from '@/pages/admin/AdminAppointmentsPage';
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="/doctor/schedule" element={<SchedulePage />} />
             <Route path="/doctor/patients" element={<DoctorPatientsPage />} />
             <Route path="/doctor/profile" element={<DoctorProfilePage />} />
+            <Route path="/doctor/appointments/:id" element={<VisitPage />} />
 
             <Route path="/admin/patients" element={<AdminPatientsPage />} />
             <Route path="/admin/appointments" element={<AdminAppointmentsPage />} />

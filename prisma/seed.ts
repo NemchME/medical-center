@@ -383,17 +383,101 @@ async function main() {
       return d;
     };
 
-    const historical = [
-      { pIdx: 0, dIdx: 0, days: -40, hour: 10, status: 'completed' },
-      { pIdx: 0, dIdx: 1, days: -15, hour: 14, status: 'completed' },
-      { pIdx: 1, dIdx: 0, days: -35, hour: 9, status: 'completed' },
+    interface HistoricalCase {
+      pIdx: number;
+      dIdx: number;
+      days: number;
+      hour: number;
+      status: string;
+      complaints?: string;
+      diagnosis?: string;
+      examination?: string;
+      notes?: string;
+      prescriptions?: string[];
+    }
+    const historical: HistoricalCase[] = [
+      {
+        pIdx: 0, dIdx: 0, days: -40, hour: 10, status: 'completed',
+        complaints: 'Кашель и боль в горле в течение 3 дней, температура 37.8',
+        examination: 'Зев гиперемирован, миндалины не увеличены, лимфоузлы безболезненны. Лёгкие — везикулярное дыхание, хрипов нет.',
+        diagnosis: 'J06.9 ОРВИ, неуточнённая',
+        notes: 'Контрольная явка не требуется. При ухудшении — повторно.',
+        prescriptions: [
+          'Парацетамол 500 мг при температуре выше 38°C, не более 4 раз в сутки — 5 дней',
+          'Тантум Верде спрей в горло — 3-4 раза в день, 5 дней',
+          'Обильное тёплое питьё, постельный режим',
+        ],
+      },
+      {
+        pIdx: 0, dIdx: 1, days: -15, hour: 14, status: 'completed',
+        complaints: 'Перебои в работе сердца, одышка при подъёме на 3 этаж',
+        examination: 'АД 145/95 мм рт.ст., ЧСС 88 уд/мин. Тоны сердца приглушены, ритм правильный. Шумов нет. Лёгкие — без особенностей.',
+        diagnosis: 'I10 Эссенциальная (первичная) гипертензия',
+        notes: 'Назначено суточное мониторирование АД, ЭКГ. Контроль через 2 недели.',
+        prescriptions: [
+          'Лизиноприл 10 мг 1 раз в сутки утром — длительно',
+          'Бисопролол 2.5 мг 1 раз в сутки утром — длительно',
+          'Контроль АД дважды в день, ведение дневника давления',
+        ],
+      },
+      {
+        pIdx: 1, dIdx: 0, days: -35, hour: 9, status: 'completed',
+        complaints: 'Плановый профилактический осмотр',
+        examination: 'Общее состояние удовлетворительное. Кожные покровы чистые. АД 120/80 мм рт.ст.',
+        diagnosis: 'Z00.0 Общий медицинский осмотр',
+        notes: 'Здоров. Рекомендован контроль через 12 месяцев.',
+        prescriptions: [],
+      },
       { pIdx: 1, dIdx: 2, days: -10, hour: 11, status: 'no_show' },
-      { pIdx: 2, dIdx: 3, days: -45, hour: 9, status: 'completed' },
+      {
+        pIdx: 2, dIdx: 3, days: -45, hour: 9, status: 'completed',
+        complaints: 'Боль в правом подреберье после жирной пищи',
+        examination: 'Живот мягкий, болезненный в правом подреберье. Симптом Ортнера положительный. Печень не увеличена.',
+        diagnosis: 'K80.2 Камни жёлчного пузыря без холецистита',
+        notes: 'Направлен на УЗИ органов брюшной полости. Консультация хирурга при подтверждении.',
+        prescriptions: [
+          'Урсодезоксихолевая кислота 250 мг 2 раза в сутки — 30 дней',
+          'Диета №5: исключить жирное, жареное, острое, алкоголь',
+          'УЗИ органов брюшной полости в течение недели',
+        ],
+      },
       { pIdx: 2, dIdx: 0, days: -20, hour: 10, status: 'no_show' },
       { pIdx: 2, dIdx: 0, days: -5, hour: 10, status: 'no_show' },
-      { pIdx: 3, dIdx: 4, days: -30, hour: 15, status: 'completed' },
-      { pIdx: 4, dIdx: 1, days: -25, hour: 14, status: 'completed' },
-      { pIdx: 4, dIdx: 1, days: -8, hour: 16, status: 'completed' },
+      {
+        pIdx: 3, dIdx: 4, days: -30, hour: 15, status: 'completed',
+        complaints: 'Высыпания и зуд на кистях рук в течение недели',
+        examination: 'На тыльной поверхности кистей — эритематозные папулы с шелушением. Дермографизм красный, стойкий.',
+        diagnosis: 'L23.0 Аллергический контактный дерматит',
+        notes: 'Рекомендовано избегать контакта с моющими средствами. Использовать перчатки.',
+        prescriptions: [
+          'Мометазон крем 0.1% на поражённые участки — 1 раз в сутки, 14 дней',
+          'Цетиризин 10 мг 1 раз в сутки на ночь — 7 дней',
+          'Эмолент Эмолиум на сухие участки кожи — 2-3 раза в день постоянно',
+        ],
+      },
+      {
+        pIdx: 4, dIdx: 1, days: -25, hour: 14, status: 'completed',
+        complaints: 'Учащённое сердцебиение в покое',
+        examination: 'АД 130/85 мм рт.ст., ЧСС 102 уд/мин. Тоны сердца ясные, ритм правильный. ЭКГ — синусовая тахикардия.',
+        diagnosis: 'R00.0 Тахикардия неуточнённая',
+        notes: 'Анализы крови, ТТГ — для исключения тиреотоксикоза. Контроль через 3 недели.',
+        prescriptions: [
+          'Анализы: общий анализ крови, ТТГ, Т3/Т4',
+          'Холтер ЭКГ',
+          'Ограничение кофе и крепкого чая',
+        ],
+      },
+      {
+        pIdx: 4, dIdx: 1, days: -8, hour: 16, status: 'completed',
+        complaints: 'Контрольный приём после анализов',
+        examination: 'Состояние стабильное. АД 125/80 мм рт.ст., ЧСС 78 уд/мин.',
+        diagnosis: 'I49.9 Сердечная аритмия неуточнённая (купирована)',
+        notes: 'Анализы в норме, тиреотоксикоз исключён. Динамика положительная.',
+        prescriptions: [
+          'Магне B6 2 таб. 3 раза в сутки — 30 дней',
+          'Контрольный приём через 3 месяца',
+        ],
+      },
     ];
     for (const h of historical) {
       const apt = await prisma.appointment.create({
@@ -408,15 +492,25 @@ async function main() {
         },
       });
       if (h.status === 'completed') {
-        await prisma.visit.create({
+        const visit = await prisma.visit.create({
           data: {
             appointmentId: apt.id,
-            complaints: 'Плановый осмотр',
-            diagnosis: 'Здоров',
-            examination: 'Без патологии',
+            complaints: h.complaints ?? 'Плановый осмотр',
+            diagnosis: h.diagnosis ?? 'Здоров',
+            examination: h.examination ?? 'Без патологии',
+            notes: h.notes,
             closedAt: offsetDay(h.days, h.hour + 1),
           },
         });
+        for (const text of h.prescriptions ?? []) {
+          await prisma.prescription.create({
+            data: {
+              visitId: visit.id,
+              text,
+              status: 'active',
+            },
+          });
+        }
       }
     }
 
@@ -506,6 +600,8 @@ async function main() {
     console.log(`⏭️  Test results: уже есть ${existingResults}, пропускаю`);
   }
 
+  await seedMlPredictions();
+
   console.log('');
   console.log('🌱 Seed complete!');
   console.log('');
@@ -513,6 +609,106 @@ async function main() {
   console.log('  Admin:   admin@medecina.ru   / admin12345');
   console.log('  Doctor:  ivanova@medecina.ru / doctor12345  (и другие врачи)');
   console.log('  Patient: sidorov@mail.ru     / patient123   (и другие пациенты)');
+}
+
+async function seedMlPredictions() {
+  let session: any;
+  let ort: any;
+  try {
+    ort = await import('onnxruntime-node');
+    const path = require('path');
+    const fs = require('fs');
+    const candidates = [
+      path.resolve(process.cwd(), 'packages/ml-model/model.onnx'),
+      path.resolve(process.cwd(), '../../packages/ml-model/model.onnx'),
+    ];
+    const modelPath = candidates.find((p: string) => fs.existsSync(p));
+    if (!modelPath) {
+      console.warn('⚠️  ML-модель не найдена, прогнозы не созданы');
+      return;
+    }
+    session = await ort.InferenceSession.create(modelPath);
+  } catch (err) {
+    console.warn('⚠️  Не удалось загрузить ONNX-модель:', (err as Error).message);
+    return;
+  }
+
+  const apts = await prisma.appointment.findMany({
+    where: { prediction: null },
+    include: { patient: true },
+    orderBy: { startAt: 'asc' },
+  });
+
+  if (apts.length === 0) {
+    console.log('⏭️  ML predictions: все приёмы уже имеют прогноз');
+    return;
+  }
+
+  let created = 0;
+  for (const apt of apts) {
+    // История пациента до текущего приёма
+    const history = await prisma.appointment.groupBy({
+      by: ['status'],
+      where: {
+        patientId: apt.patientId,
+        startAt: { lt: apt.startAt },
+        status: { in: ['completed', 'no_show'] },
+      },
+      _count: true,
+    });
+
+    const completed = history.find(
+      (h: { status: string; _count: number }) => h.status === 'completed',
+    )?._count ?? 0;
+    const noShows = history.find(
+      (h: { status: string; _count: number }) => h.status === 'no_show',
+    )?._count ?? 0;
+    const totalVisits = completed + noShows;
+
+    const startAt = new Date(apt.startAt);
+    const createdAt = new Date(apt.createdAt);
+
+    const patientAge = apt.patient.birthDate
+      ? Math.floor(
+          (startAt.getTime() - new Date(apt.patient.birthDate).getTime()) /
+            (1000 * 60 * 60 * 24 * 365.25),
+        )
+      : 30;
+
+    const sourceChannelNum =
+      apt.sourceChannel === 'phone' ? 1 : apt.sourceChannel === 'admin' ? 2 : 0;
+
+    const features = Float32Array.from([
+      startAt.getDay(),                                                       // 1
+      startAt.getHours(),                                                     // 2
+      Math.max(0, (startAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)), // 3
+      patientAge,                                                             // 4
+      totalVisits,                                                            // 5
+      noShows,                                                                // 6
+      totalVisits > 0 ? noShows / totalVisits : 0,                           // 7
+      sourceChannelNum,                                                       // 8
+    ]);
+
+    const tensor = new ort.Tensor('float32', features, [1, 8]);
+    const results = await session.run({ [session.inputNames[0]]: tensor });
+    const probs = results[session.outputNames[1]].data as Float32Array;
+    const noShowProbability = Math.round(probs[1] * 10000) / 10000;
+
+    await prisma.mlPrediction.upsert({
+      where: { appointmentId: apt.id },
+      create: {
+        appointmentId: apt.id,
+        noShowProbability,
+        modelVersion: 'v1.0-gb',
+      },
+      update: {
+        noShowProbability,
+        modelVersion: 'v1.0-gb',
+      },
+    });
+    created++;
+  }
+  console.log(`✅ ML predictions: ${created} (через ONNX inference)`);
 }
 
 main()

@@ -4,6 +4,7 @@ import { CalendarPlus, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { appointmentsApi } from '@/api/appointments';
 import { AppointmentCard } from '@/components/shared/AppointmentCard';
+import { BookAppointmentModal } from '@/components/shared/BookAppointmentModal';
 import EmptyState from '@/components/ui/EmptyState';
 
 type TabKey = 'upcoming' | 'past' | 'all';
@@ -16,6 +17,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export function AppointmentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('upcoming');
+  const [isBookOpen, setIsBookOpen] = useState(false);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments', 'mine'],
@@ -47,11 +49,16 @@ export function AppointmentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Мои записи</h2>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-purple-700 active:scale-[0.98]">
+        <button
+          onClick={() => setIsBookOpen(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-purple-700 active:scale-[0.98]"
+        >
           <CalendarPlus className="h-4 w-4" />
           Записаться на приём
         </button>
       </div>
+
+      <BookAppointmentModal isOpen={isBookOpen} onClose={() => setIsBookOpen(false)} />
 
       <div className="flex gap-1 rounded-xl bg-gray-100 p-1 w-fit">
         {TABS.map((tab) => (

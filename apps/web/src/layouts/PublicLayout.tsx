@@ -1,16 +1,39 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { Phone, Mail, Clock } from "lucide-react";
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { Phone, Mail, Clock, LayoutDashboard, LogOut } from 'lucide-react';
+import { useAuthStore, useCurrentRole, type AppRole } from '@/stores/auth.store';
 
 const navLinks = [
-  { to: "/centers", label: "О центрах" },
-  { to: "/services", label: "Услуги и цены" },
-  { to: "/doctors", label: "Наши врачи" },
-  { to: "/tests", label: "Анализы" },
+  { to: '/centers', label: 'О центрах' },
+  { to: '/services', label: 'Услуги и цены' },
+  { to: '/doctors', label: 'Наши врачи' },
+  { to: '/tests', label: 'Анализы' },
 ];
+
+const dashboardHomeByRole: Record<AppRole, string> = {
+  patient: '/patient/appointments',
+  doctor: '/doctor/schedule',
+  admin: '/admin/patients',
+  manager: '/admin/patients',
+};
+
+function getInitials(fullName: string | undefined): string {
+  if (!fullName) return 'U';
+  return fullName
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
 
 export function PublicLayout() {
   const location = useLocation();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const role = useCurrentRole();
+  const dashboardLink = dashboardHomeByRole[role];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -21,7 +44,7 @@ export function PublicLayout() {
               <Phone className="w-3 h-3" /> +7 (473) 200-10-01
             </span>
             <span className="flex items-center gap-1">
-              <Mail className="w-3 h-3" /> info@medicina.ru
+              <Mail className="w-3 h-3" /> info@medecina.ru
             </span>
           </div>
           <span className="flex items-center gap-1">
@@ -36,7 +59,7 @@ export function PublicLayout() {
             <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center text-lg font-black">
               M
             </div>
-            <span className="text-2xl font-bold tracking-tight">medicina</span>
+            <span className="text-2xl font-bold tracking-tight">Medecina</span>
           </Link>
 
           <div className="flex items-center gap-1">
@@ -45,21 +68,45 @@ export function PublicLayout() {
                 key={link.to}
                 to={link.to}
                 className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   location.pathname === link.to
-                    ? "bg-white/20 text-white"
-                    : "text-white/70 hover:text-white hover:bg-white/10",
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/70 hover:text-white hover:bg-white/10',
                 )}
               >
                 {link.label}
               </Link>
             ))}
-            <Link
-              to="/login"
-              className="ml-4 px-5 py-2.5 bg-primary-500 hover:bg-primary-400 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-primary-400/40"
-            >
-              Войти и записаться
-            </Link>
+            {isAuthenticated && user ? (
+              <div className="ml-4 flex items-center gap-2">
+                <Link
+                  to={dashboardLink}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                  title={user.fullName ?? user.email}
+                >
+                  <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-xs font-bold">
+                    {getInitials(user.fullName)}
+                  </span>
+                  <span className="hidden md:inline text-sm text-white/90 max-w-[140px] truncate">
+                    {user.fullName ?? user.email}
+                  </span>
+                </Link>
+                <button
+                  onClick={logout}
+                  className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Выйти"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="ml-4 px-5 py-2.5 bg-primary-500 hover:bg-primary-400 rounded-lg text-sm font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-primary-400/40"
+              >
+                Войти и записаться
+              </Link>
+            )}
           </div>
         </nav>
       </header>
@@ -76,7 +123,7 @@ export function PublicLayout() {
                 <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center text-sm font-bold text-white">
                   M
                 </div>
-                <span className="text-lg font-bold text-white">medicina</span>
+                <span className="text-lg font-bold text-white">Medecina</span>
               </div>
               <p className="text-sm leading-relaxed">
                 Современная система управления клиникой для пациентов и врачей
@@ -86,11 +133,7 @@ export function PublicLayout() {
               <h4 className="text-white font-semibold mb-3">Навигация</h4>
               <div className="space-y-2">
                 {navLinks.map((link) => (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    className="block text-sm hover:text-white transition-colors"
-                  >
+                  <Link key={link.to} to={link.to} className="block text-sm hover:text-white transition-colors">
                     {link.label}
                   </Link>
                 ))}
@@ -100,30 +143,20 @@ export function PublicLayout() {
               <h4 className="text-white font-semibold mb-3">Контакты</h4>
               <div className="space-y-2 text-sm">
                 <p>+7 (473) 200-10-01</p>
-                <p>info@medicina.ru</p>
+                <p>info@medecina.ru</p>
                 <p>г. Воронеж, ул. Ленина, 42</p>
               </div>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3">Для пациентов</h4>
               <div className="space-y-2 text-sm">
-                <Link
-                  to="/register"
-                  className="block hover:text-white transition-colors"
-                >
-                  Регистрация
-                </Link>
-                <Link
-                  to="/login"
-                  className="block hover:text-white transition-colors"
-                >
-                  Вход в кабинет
-                </Link>
+                <Link to="/register" className="block hover:text-white transition-colors">Регистрация</Link>
+                <Link to="/login" className="block hover:text-white transition-colors">Вход в кабинет</Link>
               </div>
             </div>
           </div>
           <div className="border-t border-gray-800 pt-6 text-center text-xs text-gray-500">
-            &copy; 2026 medicina. Все права защищены.
+            &copy; 2026 Medecina. Курсовой проект ВГУ. Все права защищены.
           </div>
         </div>
       </footer>

@@ -133,6 +133,7 @@ model Doctor {
   experience     String?
   education      String?
   bio            String?
+  isActive       Boolean @default(true) @map("is_active")
 
   user         User?         @relation(fields: [userId], references: [id])
   center       ClinicCenter  @relation(fields: [centerId], references: [id])
@@ -229,6 +230,7 @@ model Patient {
   email     String?
   gender    String?
   address   String?
+  isActive  Boolean  @default(true) @map("is_active")
 
   user         User?         @relation(fields: [userId], references: [id])
   appointments Appointment[]

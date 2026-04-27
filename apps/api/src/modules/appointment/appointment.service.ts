@@ -45,6 +45,7 @@ export class AppointmentService {
         doctor: true,
         center: true,
         prediction: true,
+        visit: { include: { prescriptions: true } },
       },
       orderBy: { startAt: 'desc' },
     });

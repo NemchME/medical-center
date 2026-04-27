@@ -1,5 +1,5 @@
 {
-  "name": "medicina",
+  "name": "medecina",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -10,10 +10,13 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "postinstall": "prisma generate --schema=prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
     "db:generate": "prisma generate --schema=prisma/schema.prisma",
     "db:studio": "prisma studio --schema=prisma/schema.prisma",
-    "db:seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts"
+    "db:seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts",
+    "db:reset": "prisma db push --schema=prisma/schema.prisma --force-reset && npm run db:seed"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",
@@ -27,8 +30,5 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "npm@10.0.0",
-  "dependencies": {
-    "@prisma/client": "^6.19.3"
-  }
+  "packageManager": "npm@10.0.0"
 }

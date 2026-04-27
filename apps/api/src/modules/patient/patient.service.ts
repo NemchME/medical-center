@@ -7,15 +7,18 @@ export class PatientService {
 
   findAll(search?: string) {
     return this.prisma.patient.findMany({
-      where: search
-        ? {
-            OR: [
-              { fullName: { contains: search, mode: 'insensitive' } },
-              { phone: { contains: search } },
-              { email: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
+      where: {
+        isActive: true,
+        ...(search
+          ? {
+              OR: [
+                { fullName: { contains: search, mode: 'insensitive' } },
+                { phone: { contains: search } },
+                { email: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { id: 'desc' },
     });
   }
@@ -103,7 +106,10 @@ export class PatientService {
 
   async remove(id: number) {
     await this.findOne(id);
-    await this.prisma.patient.delete({ where: { id } });
+    await this.prisma.patient.update({
+      where: { id },
+      data: { isActive: false },
+    });
     return { success: true };
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import {
   Clock,
   AlertTriangle,
   X,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { appointmentsApi } from '@/api/appointments';
@@ -31,6 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function SchedulePage() {
+  const navigate = useNavigate();
   const today = new Date();
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(today, { weekStartsOn: 1 }),
@@ -350,12 +353,24 @@ export function SchedulePage() {
               )}
             </div>
 
-            <button
-              onClick={() => setSelectedAppointment(null)}
-              className="mt-6 w-full rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-700"
-            >
-              Закрыть
-            </button>
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => setSelectedAppointment(null)}
+                className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+              <button
+                onClick={() => {
+                  navigate(`/doctor/appointments/${selectedAppointment.id}`);
+                  setSelectedAppointment(null);
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700"
+              >
+                Открыть приём
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
